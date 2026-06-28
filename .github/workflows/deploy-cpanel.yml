@@ -1,8 +1,9 @@
 name: Deploy to cPanel
 
-# Push to main  ->  build the standalone bundle on GitHub  ->  rsync it to cPanel
-# over SSH  ->  restart the Passenger Node app. The build always runs (so every
-# push is validated); the deploy steps only run once the cPanel secrets exist.
+# Push to main -> build the standalone bundle on GitHub -> upload it to cPanel
+# over SFTP (works even when shell access is disabled) -> restart the Passenger
+# Node app by refreshing tmp/restart.txt. The build always runs (so every push is
+# validated); the deploy steps only run once the cPanel secrets exist.
 
 on:
   push:
@@ -30,6 +31,13 @@ jobs:
       - name: Build cPanel bundle
         run: npm run build:cpanel
 
+      # Passenger restarts the app whenever tmp/restart.txt changes. Stamp it so
+      # every deploy triggers a restart after the files land.
+      - name: Stamp restart trigger
+        run: |
+          mkdir -p web/.next/standalone/tmp
+          date -u +%s > web/.next/standalone/tmp/restart.txt
+
       # secrets can't be read inside an `if:`, so compute a gate flag here.
       - name: Check cPanel secrets are configured
         id: gate
@@ -41,29 +49,39 @@ jobs:
             echo "::notice::cPanel secrets not set yet — skipping deploy. Build succeeded."
           fi
 
-      - name: Set up SSH
+      - name: Install lftp
+        if: steps.gate.outputs.ready == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Write SSH key
         if: steps.gate.outputs.ready == 'true'
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          PORT="${{ secrets.CPANEL_SSH_PORT }}"
-          ssh-keyscan -p "${PORT:-22}" -H "${{ secrets.CPANEL_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Rsync bundle to cPanel
+      - name: Deploy over SFTP
         if: steps.gate.outputs.ready == 'true'
+        env:
+          HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          USER: ${{ secrets.CPANEL_SSH_USER }}
+          PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          APP: ${{ secrets.CPANEL_APP_PATH }}
         run: |
-          PORT="${{ secrets.CPANEL_SSH_PORT }}"
-          rsync -az --delete \
-            --exclude='.htaccess' --exclude='tmp/' --exclude='.well-known/' \
-            -e "ssh -i ~/.ssh/id_deploy -p ${PORT:-22}" \
-            web/.next/standalone/ \
-            "${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}:${{ secrets.CPANEL_APP_PATH }}/"
-
-      - name: Restart Passenger app
-        if: steps.gate.outputs.ready == 'true'
-        run: |
-          PORT="${{ secrets.CPANEL_SSH_PORT }}"
-          ssh -i ~/.ssh/id_deploy -p "${PORT:-22}" \
-            "${{ secrets.CPANEL_SSH_USER }}@${{ secrets.CPANEL_SSH_HOST }}" \
-            "mkdir -p '${{ secrets.CPANEL_APP_PATH }}/tmp' && touch '${{ secrets.CPANEL_APP_PATH }}/tmp/restart.txt'"
+          PORT="${PORT:-22}"
+          SSH="ssh -a -x -i $HOME/.ssh/id_deploy -p $PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          lftp -c "
+            set sftp:connect-program \"$SSH\";
+            set net:max-retries 2;
+            set net:timeout 25;
+            set mirror:parallel-transfer-count 4;
+            open -u \"$USER,x\" sftp://$HOST;
+            # node_modules: large but immutable per version — skip unchanged by size.
+            mirror -R --ignore-time --no-perms \
+              web/.next/standalone/node_modules \"$APP/node_modules\";
+            # everything else (app code, build output, package.json, restart trigger):
+            # small, always refreshed so server code is never stale.
+            mirror -R --no-perms -X node_modules/ \
+              web/.next/standalone/ \"$APP/\";
+            bye
+          "

@@ -1,158 +1,85 @@
 # CI/CD: GitHub → cPanel
 
-Push to `main` → GitHub Actions builds the Next.js standalone bundle → ships it to
-your cPanel Node app → restarts it. No more manual tar/upload.
+Push to `main` → GitHub Actions builds the Next.js standalone bundle → uploads it to
+your cPanel Node app over **SFTP** → restarts the app. No more manual tar/upload.
 
 The build runs on GitHub's runners on purpose. **Do not build on cPanel** — shared
 hosting almost always runs out of memory building Next.js.
 
----
-
-## 1. One-time: create the GitHub repo and push
-
-You're currently on a local `master` branch with no remote. Create an **empty**
-GitHub repo (no README/.gitignore), then:
-
-```bash
-git checkout -b main          # workflow deploys from main
-git add -A
-git commit -m "Add cPanel CI/CD pipeline"
-git remote add origin https://github.com/<you>/astrochakra.git
-git push -u origin main
-```
-
-The first push triggers the workflow. The **build** will run and succeed; the
-**deploy** steps skip themselves until you add the secrets below.
+> This host has **shell access disabled** but allows **SFTP with an SSH key**, so the
+> pipeline uploads over SFTP (not rsync, which needs a shell).
 
 ---
 
-## 2. One-time: set up the cPanel app (if not already done)
+## How it works
 
-Follow `deploy/README-CPANEL.md`. In short — cPanel → **Setup Node.js App → Create**:
+`.github/workflows/deploy-cpanel.yml`:
 
-- Node.js version: 20.x
-- Application mode: Production
-- Application root: e.g. `astrochakra`  → this is your `CPANEL_APP_PATH`
-- Application startup file: `web/server.js`
+1. `npm ci`
+2. `npm run build:cpanel` — builds the `@prisri/jyotish` lib (`tsc → dist/`) and the
+   Next.js app, then assembles `web/.next/standalone/` (server + node_modules + static).
+3. Writes `tmp/restart.txt` (touching it restarts the Passenger app).
+4. Uploads via `lftp` over SFTP:
+   - `node_modules/` — skipped unless changed (compared by size; npm packages are
+     immutable per version).
+   - everything else (app code, build output, `package.json`, `tmp/restart.txt`) —
+     always refreshed, so server code is never stale.
 
-Note the **Application root** path. It's usually `/home/<cpaneluser>/astrochakra`.
-
----
-
-## 3. Pick your transport: SSH (preferred) or FTP
-
-Check cPanel's dashboard:
-
-- **"Terminal"** or **"SSH Access"** present → use **SSH** (§4). Faster, cleaner restarts.
-- Only **"FTP Accounts"** → use **FTP** (§5).
+The deploy steps are gated on `CPANEL_SSH_HOST` existing, so before the secrets are set
+every push still runs and **validates the build** (deploy just skips).
 
 ---
 
-## 4. SSH path (uses the committed `deploy-cpanel.yml`)
+## The cPanel app
 
-### a. Generate a deploy key (on your machine)
+cPanel → **Setup Node.js App**. The app must be configured as:
 
-```bash
-ssh-keygen -t ed25519 -f astrochakra_deploy -N "" -C "github-actions"
-```
+- **Application root:** `kundli.astrochakra.co`  → `/home/bnrqpozr/kundli.astrochakra.co`
+- **Application startup file:** `web/server.js`
+- **Node.js version:** 20.x, **mode:** Production
 
-This makes `astrochakra_deploy` (private) and `astrochakra_deploy.pub` (public).
-
-### b. Authorize the public key on cPanel
-
-cPanel → **SSH Access → Manage SSH Keys → Import Key**, paste the **`.pub`**
-contents, then **Manage → Authorize**.
-(Or append it to `~/.ssh/authorized_keys` via Terminal.)
-
-### c. Add the secrets to GitHub
-
-GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**:
-
-| Secret | Value | Example |
-|---|---|---|
-| `CPANEL_SSH_HOST` | your server hostname or IP | `server123.web-host.com` |
-| `CPANEL_SSH_PORT` | SSH port (omit if 22) | `22` or `21098` |
-| `CPANEL_SSH_USER` | your cPanel username | `astroch1` |
-| `CPANEL_SSH_KEY` | **entire** private key file `astrochakra_deploy` | `-----BEGIN OPENSSH...` |
-| `CPANEL_APP_PATH` | the Application root from §2 | `/home/astroch1/astrochakra` |
-
-> Many shared hosts (e.g. Namecheap) use a non-standard SSH port like `21098` — check
-> SSH Access in cPanel.
-
-Push to `main` (or run the workflow manually from the **Actions** tab) → it deploys.
+The upload target (`CPANEL_APP_PATH`) must equal the Application root. The bundle's
+layout (`node_modules/`, `package.json`, `web/server.js`) lands there so the startup
+file `web/server.js` resolves correctly.
 
 ---
 
-## 5. FTP path (if you have no SSH)
+## The SSH key (already done)
 
-Replace the contents of `.github/workflows/deploy-cpanel.yml` with this, then add the
-FTP secrets:
+A no-passphrase RSA key pair is used:
 
-```yaml
-name: Deploy to cPanel (FTP)
+- **Public** key imported + **authorized** in cPanel → SSH Access → Manage SSH Keys
+  (`github_deploy`).
+- **Private** key stored in the GitHub secret `CPANEL_SSH_KEY`.
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+To rotate: generate a new pair (`ssh-keygen -t rsa -b 4096 -N "" -f key`), authorize the
+`.pub` in cPanel, replace the `CPANEL_SSH_KEY` secret. **The private key must have no
+passphrase** — its second line must start with `b3BlbnNzaC1rZXktdjEAAAAABG5vbmU` (= "none").
 
-concurrency:
-  group: deploy-cpanel
-  cancel-in-progress: false
+---
 
-jobs:
-  build-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build:cpanel
+## GitHub secrets
 
-      # Bump a file so Passenger restarts after the upload (mtime/content changes).
-      - name: Stamp restart trigger
-        run: |
-          mkdir -p web/.next/standalone/tmp
-          date -u +%s > web/.next/standalone/tmp/restart.txt
-
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: web/.next/standalone/
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}   # e.g. astrochakra/  (relative to FTP home)
-          # Only changed files are uploaded; the action keeps a state file on the server.
-```
-
-FTP secrets:
+Repo → **Settings → Secrets and variables → Actions**:
 
 | Secret | Value |
 |---|---|
-| `FTP_SERVER` | FTP host, e.g. `ftp.yourdomain.com` |
-| `FTP_USERNAME` | FTP account user |
-| `FTP_PASSWORD` | FTP account password |
-| `FTP_SERVER_DIR` | path to the app root **relative to the FTP login home**, with trailing slash, e.g. `astrochakra/` |
-
-FTP is slower (uploads thousands of `node_modules` files the first time) and the
-restart relies on re-uploading `tmp/restart.txt`. It works, but SSH is nicer if you
-can get it.
+| `CPANEL_SSH_KEY` | the entire private key (incl. BEGIN/END lines), no passphrase |
+| `CPANEL_SSH_HOST` | `190.92.174.127` |
+| `CPANEL_SSH_USER` | `bnrqpozr` |
+| `CPANEL_SSH_PORT` | `22` |
+| `CPANEL_APP_PATH` | `/home/bnrqpozr/kundli.astrochakra.co` |
 
 ---
 
 ## Verify after deploy
 
-1. Open your Application URL.
+1. Open https://kundli.astrochakra.co
 2. Generate a chart and confirm the server-computed sections (KP, Jaimini, Transit,
    Varshaphal) populate — those only render from the live server build.
 3. If the page errors, check the Node app log in cPanel → Setup Node.js App.
 
-## How updates work from now on
+## From now on
 
-Edit code → commit → `git push`. That's the whole deploy. To update the calc library,
-remember it's compiled (`dist/`); the workflow rebuilds it automatically via
-`npm run build:cpanel`.
+Edit code → commit → `git push`. That's the whole deploy. The library is recompiled
+automatically by `npm run build:cpanel`.
