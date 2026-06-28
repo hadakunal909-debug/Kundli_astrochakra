@@ -87,18 +87,17 @@ jobs:
             set mirror:use-pget-n 1;
             open -u \"$USER,x\" sftp://$HOST;
             mkdir -f \"$APP/tmp\";
-            mkdir -f \"$APP/web\";
             # 3rd-party deps: large but stable — skip unchanged by size.
             mirror -R --ignore-time --no-perms web/.next/standalone/node_modules \"$APP/node_modules\";
             # our calculation library changes every deploy — force an exact match.
             mirror -R --delete --no-perms web/.next/standalone/node_modules/@prisri \"$APP/node_modules/@prisri\";
-            # Next.js build output — force fresh (it is pure build output; safe to mirror-delete).
-            mirror -R --delete --no-perms -X cache/ web/.next/standalone/web/.next \"$APP/web/.next\";
-            mirror -R --no-perms web/.next/standalone/web/public \"$APP/web/public\";
-            put -O \"$APP/web\" web/.next/standalone/web/server.js;
-            put -O \"$APP/web\" web/.next/standalone/web/package.json;
+            # the ENTIRE app subtree (server.js, public, .next/server AND .next/static) —
+            # force fresh so the served JS chunks always match the server build.
+            mirror -R --delete --no-perms web/.next/standalone/web \"$APP/web\";
             put -O \"$APP\" web/.next/standalone/package.json;
             put -O \"$APP/tmp\" web/.next/standalone/tmp/restart.txt;
+            echo '=== remote static chunks after upload ===';
+            cls -1 \"$APP/web/.next/static/chunks/\";
             bye
           "
 
