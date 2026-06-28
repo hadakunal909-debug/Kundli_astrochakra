@@ -81,5 +81,14 @@ Repo → **Settings → Secrets and variables → Actions**:
 
 ## From now on
 
-Edit code → commit → `git push`. That's the whole deploy. The library is recompiled
-automatically by `npm run build:cpanel`.
+Edit code → commit → `git push`. CI builds and uploads the new bundle automatically.
+
+> ⚠️ **Manual restart required.** This host's Passenger does **not** honor
+> `tmp/restart.txt`, so after each push you must publish the upload by restarting the app:
+> cPanel → **Setup Node.js App** → **Restart**. The workflow's last step tells you whether
+> the live site already reflects the build or still needs the restart. (To automate this
+> later, add a cPanel API token secret and a UAPI `PassengerApps::restart_application` call.)
+
+The library (`@prisri/jyotish`) is the monorepo root and is symlinked into `node_modules`;
+Next does not bundle it into the standalone output, so `scripts/build-cpanel.mjs` copies it
+in as real files. Don't remove that step or deploys will ship stale calculation code.
