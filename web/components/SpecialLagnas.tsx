@@ -1,7 +1,13 @@
+"use client";
+
+import { useState } from "react";
 import type { KundliResponse } from "@/lib/types";
-import { formatDMS } from "@/lib/jyotish-ui";
+import { formatDMS, buildLagnaChart } from "@/lib/jyotish-ui";
+import NorthChart from "./NorthChart";
+import SouthChart from "./SouthChart";
 
 type Point = NonNullable<KundliResponse["kundli"]["specialLagnas"]>["lagnas"][number];
+type Style = "north" | "south";
 
 function PointTable({ points }: { points: Point[] }) {
   return (
@@ -33,6 +39,7 @@ function PointTable({ points }: { points: Point[] }) {
 }
 
 export default function SpecialLagnas({ data }: { data: KundliResponse }) {
+  const [style, setStyle] = useState<Style>("north");
   const sl = data.kundli.specialLagnas;
   if (!sl) {
     return (
@@ -46,12 +53,39 @@ export default function SpecialLagnas({ data }: { data: KundliResponse }) {
   return (
     <div className="sl-wrap">
       <p className="sl-intro">
-        Special ascendants and shadow points used in classical Vedic analysis. Each is
-        read like a lagna for its own significations. Indu and Varnada are sign-only
-        points by tradition; the rest carry an exact degree.
+        Special ascendants and shadow points used in classical Vedic analysis. Each special
+        lagna is cast as a full chart — its sign becomes the 1st house and the planets are
+        placed around it, read just like the Rashi (D1) chart for its own significations.
       </p>
 
-      <h3 className="sl-heading">Special Lagnas</h3>
+      <div className="varga-toolbar">
+        <div className="seg">
+          <button className={`seg-btn${style === "north" ? " active" : ""}`} onClick={() => setStyle("north")}>
+            North Indian
+          </button>
+          <button className={`seg-btn${style === "south" ? " active" : ""}`} onClick={() => setStyle("south")}>
+            South Indian
+          </button>
+        </div>
+      </div>
+
+      <div className="varga-grid">
+        {sl.lagnas.map((p) => {
+          const cd = buildLagnaChart(data, p.rashi);
+          return (
+            <div className="varga-cell" key={p.name}>
+              {style === "north" ? (
+                <NorthChart data={cd} title={`${p.name} · ${p.rashiName}`} />
+              ) : (
+                <SouthChart data={cd} title={`${p.name} · ${p.rashiName}`} />
+              )}
+              <p className="varga-purpose">{p.note}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <h3 className="sl-heading">Special Lagnas · Positions</h3>
       <PointTable points={sl.lagnas} />
 
       <h3 className="sl-heading">Upagrahas · Shadow Sub-planets</h3>

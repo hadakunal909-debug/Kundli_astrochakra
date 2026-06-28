@@ -2,8 +2,9 @@ name: Deploy to cPanel
 
 # Push to main -> build the standalone bundle on GitHub -> upload it to cPanel
 # over SFTP (works even when shell access is disabled) -> restart the Passenger
-# Node app by refreshing tmp/restart.txt. The build always runs (so every push is
-# validated); the deploy steps only run once the cPanel secrets exist.
+# Node app by refreshing tmp/restart.txt -> verify the new code is actually live.
+# The build always runs (so every push is validated); the deploy steps only run
+# once the cPanel secrets exist.
 
 on:
   push:
@@ -70,18 +71,49 @@ jobs:
         run: |
           PORT="${PORT:-22}"
           SSH="ssh -a -x -i $HOME/.ssh/id_deploy -p $PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          # cmd:fail-exit makes lftp exit non-zero on ANY failed command, so a broken
+          # connection or transfer turns the job red instead of passing silently.
           lftp -c "
+            set cmd:fail-exit yes;
+            set sftp:auto-confirm yes;
             set sftp:connect-program \"$SSH\";
             set net:max-retries 2;
             set net:timeout 25;
             set mirror:parallel-transfer-count 4;
             open -u \"$USER,x\" sftp://$HOST;
-            # node_modules: large but immutable per version — skip unchanged by size.
-            mirror -R --ignore-time --no-perms \
-              web/.next/standalone/node_modules \"$APP/node_modules\";
-            # everything else (app code, build output, package.json, restart trigger):
-            # small, always refreshed so server code is never stale.
-            mirror -R --no-perms -X node_modules/ \
-              web/.next/standalone/ \"$APP/\";
+            mkdir -f \"$APP/tmp\";
+            mkdir -f \"$APP/web\";
+            # 3rd-party deps: large but stable — skip unchanged by size.
+            mirror -R --ignore-time --no-perms web/.next/standalone/node_modules \"$APP/node_modules\";
+            # our calculation library changes every deploy — force an exact match.
+            mirror -R --delete --no-perms web/.next/standalone/node_modules/@prisri \"$APP/node_modules/@prisri\";
+            # Next.js build output — force fresh (it is pure build output; safe to mirror-delete).
+            mirror -R --delete --no-perms -X cache/ web/.next/standalone/web/.next \"$APP/web/.next\";
+            mirror -R --no-perms web/.next/standalone/web/public \"$APP/web/public\";
+            put -O \"$APP/web\" web/.next/standalone/web/server.js;
+            put -O \"$APP/web\" web/.next/standalone/web/package.json;
+            put -O \"$APP\" web/.next/standalone/package.json;
+            put -O \"$APP/tmp\" web/.next/standalone/tmp/restart.txt;
             bye
           "
+
+      - name: Verify deployment is live
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          APP_URL: ${{ secrets.CPANEL_APP_URL }}
+        run: |
+          URL="${APP_URL:-https://kundli.astrochakra.co}"
+          PAYLOAD='{"name":"CI","date":"1990-01-01","time":"12:00","place":{"lat":28.6,"lon":77.2,"label":"D"}}'
+          echo "Verifying $URL reflects this build (allowing Passenger a moment to restart)…"
+          for i in $(seq 1 8); do
+            sleep 15
+            body=$(curl -s --max-time 30 -X POST "$URL/api/kundli" -H "Content-Type: application/json" -d "$PAYLOAD" || true)
+            vc=$(printf '%s' "$body" | grep -o '"d[0-9]\{1,2\}":' | sort -u | wc -l)
+            if printf '%s' "$body" | grep -q '"specialLagnas"' && [ "$vc" -ge 60 ]; then
+              echo "✓ Live site updated: specialLagnas present, $vc divisional charts."
+              exit 0
+            fi
+            echo "attempt $i — vargas=$vc, specialLagnas present: $(printf '%s' "$body" | grep -qo specialLagnas && echo yes || echo no)"
+          done
+          echo "::error::Files uploaded but the live site did not update (Passenger likely did not restart). Check the cPanel Node app."
+          exit 1

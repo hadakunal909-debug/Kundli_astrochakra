@@ -207,6 +207,22 @@ export function buildD9(data: KundliResponse): ChartData | null {
   return buildVarga(data, "d9");
 }
 
+/**
+ * Cast a chart from any sign as the 1st house, placing the natal (D1) planets by sign —
+ * used for special-lagna charts (Bhava/Hora/Indu/Sree… as the ascendant), the same way a
+ * Moon chart (Chandra lagna) is drawn.
+ */
+export function buildLagnaChart(data: KundliResponse, ascRashi1: number): ChartData {
+  const houses = emptyHouses();
+  const asc0 = (((ascRashi1 - 1) % 12) + 12) % 12;
+  for (const [name, p] of Object.entries(data.kundli.planets)) {
+    const sign0 = Math.floor((((p.longitude % 360) + 360) % 360) / 30);
+    const house = ((sign0 - asc0 + 12) % 12) + 1;
+    houses[house].push(glyphFor(name, { degree: degreeInSign(p.longitude), retro: p.isRetrograde }));
+  }
+  return { ascRashi: asc0 + 1, houses };
+}
+
 /** Build the Bhava Chalit chart — planets placed by their bhava (asc-centred houses). */
 export function buildChalitChart(data: KundliResponse): ChartData | null {
   const c = data.kundli.chalit;
