@@ -1115,6 +1115,64 @@ thead th {
   color: var(--green);
 }
 
+/* Yogas (auspicious combinations) — shown alongside the doshas. */
+.dosha-status.is-yoga {
+  background: #e6f4e6;
+  color: var(--green);
+}
+
+.dosha-status.is-affliction {
+  background: #fdeaea;
+  color: var(--red);
+}
+
+.dosha-status.is-neutral {
+  background: #eee9dc;
+  color: var(--text-dim);
+}
+
+.yoga-card--bad {
+  border-color: #e7b7b7;
+  background: linear-gradient(180deg, #fdf5f5, #fff);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.dosha-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yoga-strength {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--head-bg);
+  color: var(--head-text);
+  white-space: nowrap;
+}
+
+.yoga-group-h {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--head-text);
+  margin: 6px 0 2px;
+}
+
+.yoga-card--raja {
+  border-color: var(--accent-2);
+  background: linear-gradient(180deg, #fffaf0, #fff);
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+
+.yoga-card--raja .dosha-status.is-yoga {
+  background: var(--head-bg);
+  color: var(--head-text);
+}
+
 .dosha-body p {
   margin: 0;
   font-size: 14px;
@@ -1328,6 +1386,12 @@ thead th {
   padding: 10px 16px;
 }
 
+.dl-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .app-body {
   display: grid;
   grid-template-columns: 216px 1fr;
@@ -1438,6 +1502,95 @@ thead th {
     white-space: nowrap;
     border: 1px solid var(--border);
   }
+}
+
+/* ── Premium report ──────────────────────────────────────────────────────────── */
+.premium-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 22px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #fffdf7, #f6ecd6);
+  margin-bottom: 14px;
+}
+
+.cs-gauge {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 22px rgba(224, 118, 15, 0.3);
+}
+.cs-value { font-size: 44px; font-weight: 800; line-height: 1; }
+.cs-label { font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.95; }
+
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 22px;
+}
+.score-row { display: flex; flex-direction: column; gap: 3px; }
+.score-head { display: flex; justify-content: space-between; align-items: baseline; }
+.score-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.score-val { font-size: 13px; font-weight: 800; }
+.score-note { font-size: 11px; color: var(--text-dim); margin-top: 3px; line-height: 1.35; }
+.score-track { height: 8px; border-radius: 999px; background: #ece6d8; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 999px; }
+
+.sc-strong { color: #2e7d32; } .score-fill.sc-strong { background: #2e7d32; }
+.sc-good { color: #1565c0; } .score-fill.sc-good { background: #1565c0; }
+.sc-mod { color: #e0760f; } .score-fill.sc-mod { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.sc-dev { color: #8a8170; } .score-fill.sc-dev { background: #b3a98f; }
+
+.premium-best {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff3df;
+  border: 1px solid #f0d9af;
+  font-size: 14px;
+}
+
+.premium-section { margin: 0 0 22px; }
+.premium-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  color: var(--head-text);
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent-2);
+}
+.premium-n {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: grid; place-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.premium-section p { font-size: 14px; line-height: 1.6; margin: 0 0 8px; }
+
+.sw-grid, .plan-grid { display: grid; gap: 18px; }
+.sw-grid { grid-template-columns: 1fr 1fr; }
+.plan-grid { grid-template-columns: repeat(3, 1fr); }
+.sw-h { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--head-text); }
+.sw-pos { color: #2e7d32; } .sw-neg { color: #c0610f; }
+.sw-grid ul, .plan-grid ul, .yoga-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
+.md-block { padding: 8px 0; border-bottom: 1px solid #f1eee6; }
+.md-title { font-weight: 700; color: var(--head-text); margin-bottom: 2px; }
+
+@media (max-width: 760px) {
+  .premium-hero { grid-template-columns: 1fr; justify-items: center; }
+  .score-grid, .sw-grid, .plan-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Report document (screen + print) ───────────────────────────────────────── */

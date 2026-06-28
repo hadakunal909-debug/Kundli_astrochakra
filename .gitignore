@@ -3,6 +3,10 @@ dist
 web/.next
 web/out
 .vercel
+deploy/
+*.zip
+*.tar.gz
+*.tsbuildinfo
 .env
 .env.local
 npm-debug.log

@@ -12,6 +12,7 @@ import PlanetTable from "@/components/PlanetTable";
 import DashaTimeline from "@/components/DashaTimeline";
 import Ashtakavarga from "@/components/Ashtakavarga";
 import Doshas from "@/components/Doshas";
+import Yogas from "@/components/Yogas";
 import Numerology from "@/components/Numerology";
 import Predictions from "@/components/Predictions";
 import Remedies from "@/components/Remedies";
@@ -23,15 +24,17 @@ import YoginiDasha from "@/components/YoginiDasha";
 import Varshaphal from "@/components/Varshaphal";
 import Shadbala from "@/components/Shadbala";
 import LalKitab from "@/components/LalKitab";
+import PremiumReport from "@/components/premium/PremiumReport";
 import PanchangPanel from "@/components/PanchangPanel";
 import DownloadButtons from "@/components/DownloadButtons";
 
 const NAV: { label: string; tabs: string[] }[] = [
+  { label: "Premium", tabs: ["Premium Report"] },
   { label: "Overview", tabs: ["Chart", "Planets"] },
   { label: "Charts", tabs: ["Divisional"] },
   { label: "Dashas", tabs: ["Vimshottari", "Yogini", "Varshaphal"] },
   { label: "Strength", tabs: ["Ashtakavarga", "Shadbala", "Friendship"] },
-  { label: "Predictions", tabs: ["Predictions", "Doshas", "Numerology"] },
+  { label: "Predictions", tabs: ["Predictions", "Yogas & Doshas", "Numerology"] },
   { label: "Advanced", tabs: ["KP", "Jaimini", "Lal Kitab"] },
   { label: "Timing & Remedies", tabs: ["Transit", "Remedies", "Panchang"] },
 ];
@@ -39,7 +42,7 @@ const NAV: { label: string; tabs: string[] }[] = [
 export default function ResultPage() {
   const [data, setData] = useState<KundliResponse | null>(null);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<string>("Chart");
+  const [tab, setTab] = useState<string>("Premium Report");
 
   useEffect(() => {
     setData(loadResult());
@@ -69,13 +72,20 @@ export default function ResultPage() {
 
   function renderTab() {
     switch (tab) {
+      case "Premium Report": return <PremiumReport data={data!} />;
       case "Chart": return <Charts data={data!} />;
       case "Divisional": return <DivisionalCharts data={data!} />;
       case "Planets": return <PlanetTable data={data!} />;
       case "Vimshottari": return <DashaTimeline data={data!} />;
       case "Yogini": return <YoginiDasha data={data!} />;
       case "Ashtakavarga": return <Ashtakavarga data={data!} />;
-      case "Doshas": return <Doshas data={data!} />;
+      case "Yogas & Doshas": return (
+        <>
+          <Yogas data={data!} />
+          <h3 className="yoga-group-h" style={{ marginTop: 24 }}>Doshas</h3>
+          <Doshas data={data!} />
+        </>
+      );
       case "Predictions": return <Predictions data={data!} />;
       case "Remedies": return <Remedies data={data!} />;
       case "Numerology": return <Numerology data={data!} />;

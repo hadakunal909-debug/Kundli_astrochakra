@@ -7,8 +7,19 @@ export default function DownloadButtons({ data }: { data: KundliResponse }) {
   const router = useRouter();
   void data;
   return (
-    <button className="btn-primary download-report" onClick={() => router.push("/report?print=1")}>
-      ⬇ Download Report
-    </button>
+    <div className="dl-group">
+      <button
+        className="btn-primary download-report"
+        onClick={() => router.push("/premium?print=1")}
+      >
+        ★ Premium Report
+      </button>
+      <button
+        className="btn-ghost download-report"
+        onClick={() => router.push("/report?print=1")}
+      >
+        ⬇ Technical Report
+      </button>
+    </div>
   );
 }
