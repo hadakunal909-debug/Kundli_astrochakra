@@ -8,6 +8,9 @@ export { Observer, Body as Planets } from 'astronomy-engine';
 
 export * from './kundli/index';
 export * from './kundli/types';
+export * from './kundli/special-lagnas';
+export * from './kundli/bhava-chalit';
+export * from './kundli/bhavat-bhavam';
 export * from './kundli/ashtakavarga';
 export * from './kundli/avkahada';
 export * from './kundli/doshas';

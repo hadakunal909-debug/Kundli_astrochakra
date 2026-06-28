@@ -8,6 +8,8 @@ import { formatDate } from "@/lib/format";
 import Overview from "@/components/Overview";
 import Charts from "@/components/Charts";
 import DivisionalCharts from "@/components/DivisionalCharts";
+import SpecialLagnas from "@/components/SpecialLagnas";
+import BhavaChalit from "@/components/BhavaChalit";
 import PlanetTable from "@/components/PlanetTable";
 import DashaTimeline from "@/components/DashaTimeline";
 import Ashtakavarga from "@/components/Ashtakavarga";
@@ -31,7 +33,7 @@ import DownloadButtons from "@/components/DownloadButtons";
 const NAV: { label: string; tabs: string[] }[] = [
   { label: "Premium", tabs: ["Premium Report"] },
   { label: "Overview", tabs: ["Chart", "Planets"] },
-  { label: "Charts", tabs: ["Divisional"] },
+  { label: "Charts", tabs: ["Divisional", "Special Lagnas", "Bhava Chalit"] },
   { label: "Dashas", tabs: ["Vimshottari", "Yogini", "Varshaphal"] },
   { label: "Strength", tabs: ["Ashtakavarga", "Shadbala", "Friendship"] },
   { label: "Predictions", tabs: ["Predictions", "Yogas & Doshas", "Numerology"] },
@@ -75,6 +77,8 @@ export default function ResultPage() {
       case "Premium Report": return <PremiumReport data={data!} />;
       case "Chart": return <Charts data={data!} />;
       case "Divisional": return <DivisionalCharts data={data!} />;
+      case "Special Lagnas": return <SpecialLagnas data={data!} />;
+      case "Bhava Chalit": return <BhavaChalit data={data!} />;
       case "Planets": return <PlanetTable data={data!} />;
       case "Vimshottari": return <DashaTimeline data={data!} />;
       case "Yogini": return <YoginiDasha data={data!} />;

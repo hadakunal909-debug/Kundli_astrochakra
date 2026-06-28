@@ -19,6 +19,8 @@ import Remedies from "@/components/Remedies";
 import Transit from "@/components/Transit";
 import FriendshipTable from "@/components/FriendshipTable";
 import ShodashvargaTable from "@/components/ShodashvargaTable";
+import SpecialLagnas from "@/components/SpecialLagnas";
+import BhavaChalit from "@/components/BhavaChalit";
 import KpTable from "@/components/KpTable";
 import JaiminiPanel from "@/components/JaiminiPanel";
 import YoginiDasha from "@/components/YoginiDasha";
@@ -140,6 +142,16 @@ export default function ReportPage() {
       <section className="report-section">
         <h2 className="section-title">Shodashvarga Table</h2>
         <ShodashvargaTable data={data} />
+      </section>
+
+      <section className="report-section">
+        <h2 className="section-title">Special Lagnas &amp; Upagrahas</h2>
+        <SpecialLagnas data={data} />
+      </section>
+
+      <section className="report-section">
+        <h2 className="section-title">Bhava Chalit &amp; Bhavat Bhavam</h2>
+        <BhavaChalit data={data} />
       </section>
 
       <section className="report-section">

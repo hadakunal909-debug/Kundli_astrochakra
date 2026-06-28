@@ -14,6 +14,9 @@ import { rashiNames, nakshatraNames, nakshatraLords } from "../core/constants";
 import { PlanetaryPosition } from "../core/types";
 import { getHouses } from "./houses";
 import { getAllVargas } from "./vargas";
+import { getSpecialLagnas } from "./special-lagnas";
+import { getBhavaChalit } from "./bhava-chalit";
+import { getBhavatBhavam } from "./bhavat-bhavam";
 import { getAshtakavarga } from "./ashtakavarga";
 import { getAvkahada } from "./avkahada";
 import { getDoshas } from "./doshas";
@@ -143,6 +146,15 @@ export function getKundli(
   // 6. Calculate Vargas (D1-D60)
   const vargas = getAllVargas(lagnaLon, planets);
 
+  // 6b. Special lagnas, Bhrigu Bindu and upagrahas
+  const specialLagnas = getSpecialLagnas(date, observer, planets, lagnaLon);
+
+  // 6c. Bhava Chalit chart (planets by house, asc-centred bhavas)
+  const chalit = getBhavaChalit(planets, lagnaLon);
+
+  // 6d. Bhavat Bhavam (house-from-house) analysis
+  const bhavatBhavam = getBhavatBhavam(planets, lagnaLon);
+
   // 7. Ashtakavarga (BAV per planet + SAV)
   const ashtakavarga = getAshtakavarga(planets, lagnaLon);
 
@@ -190,6 +202,9 @@ export function getKundli(
     jaimini,
     yogini,
     varshaphal,
+    specialLagnas,
+    chalit,
+    bhavatBhavam,
   };
 }
 

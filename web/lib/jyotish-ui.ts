@@ -207,6 +207,18 @@ export function buildD9(data: KundliResponse): ChartData | null {
   return buildVarga(data, "d9");
 }
 
+/** Build the Bhava Chalit chart — planets placed by their bhava (asc-centred houses). */
+export function buildChalitChart(data: KundliResponse): ChartData | null {
+  const c = data.kundli.chalit;
+  if (!c) return null;
+  const houses = emptyHouses();
+  for (const p of c.planets) {
+    if (p.bhava < 1 || p.bhava > 12) continue;
+    houses[p.bhava].push(glyphFor(p.name, { degree: degreeInSign(p.longitude) }));
+  }
+  return { ascRashi: c.ascRashi, houses };
+}
+
 // Divisional-chart catalogue (Parashari shodasavarga set computed by the library).
 export interface VargaMeta {
   key: string;
@@ -214,24 +226,47 @@ export interface VargaMeta {
   purpose: string;
 }
 
-export const VARGAS: VargaMeta[] = [
-  { key: "d1", label: "D1 · Rashi", purpose: "Body, overall life" },
-  { key: "d2", label: "D2 · Hora", purpose: "Wealth & resources" },
-  { key: "d3", label: "D3 · Drekkana", purpose: "Siblings, courage" },
-  { key: "d4", label: "D4 · Chaturthamsha", purpose: "Property, fortune" },
-  { key: "d7", label: "D7 · Saptamsha", purpose: "Children, progeny" },
-  { key: "d9", label: "D9 · Navamsa", purpose: "Spouse, dharma, strength" },
-  { key: "d10", label: "D10 · Dasamsa", purpose: "Career, status" },
-  { key: "d12", label: "D12 · Dwadasamsa", purpose: "Parents, ancestry" },
-  { key: "d16", label: "D16 · Shodasamsa", purpose: "Vehicles, comforts" },
-  { key: "d20", label: "D20 · Vimsamsa", purpose: "Spirituality" },
-  { key: "d24", label: "D24 · Chaturvimshamsa", purpose: "Education, learning" },
-  { key: "d27", label: "D27 · Bhamsa", purpose: "Strengths & weaknesses" },
-  { key: "d30", label: "D30 · Trimsamsa", purpose: "Misfortunes, doshas" },
-  { key: "d40", label: "D40 · Khavedamsa", purpose: "Maternal lineage" },
-  { key: "d45", label: "D45 · Akshavedamsa", purpose: "Character, conduct" },
-  { key: "d60", label: "D60 · Shashtiamsa", purpose: "Past-life karma" },
-];
+// Classical names + significations for the divisions that have them. Divisions not
+// listed here are unnamed and use the generic cyclic varga rule.
+const VARGA_INFO: Record<number, { name: string; purpose: string }> = {
+  1: { name: "Rashi", purpose: "Body, overall life" },
+  2: { name: "Hora", purpose: "Wealth & resources" },
+  3: { name: "Drekkana", purpose: "Siblings, courage" },
+  4: { name: "Chaturthamsha", purpose: "Property, fortune" },
+  5: { name: "Panchamsa", purpose: "Fame, power, authority" },
+  6: { name: "Shashthamsa", purpose: "Health, ailments" },
+  7: { name: "Saptamsha", purpose: "Children, progeny" },
+  8: { name: "Ashtamsa", purpose: "Sudden events, longevity" },
+  9: { name: "Navamsa", purpose: "Spouse, dharma, strength" },
+  10: { name: "Dasamsa", purpose: "Career, status" },
+  11: { name: "Rudramsa", purpose: "Gains, death & destruction" },
+  12: { name: "Dwadasamsa", purpose: "Parents, ancestry" },
+  16: { name: "Shodasamsa", purpose: "Vehicles, comforts" },
+  20: { name: "Vimsamsa", purpose: "Spirituality" },
+  24: { name: "Chaturvimshamsa", purpose: "Education, learning" },
+  27: { name: "Bhamsa", purpose: "Strengths & weaknesses" },
+  30: { name: "Trimsamsa", purpose: "Misfortunes, doshas" },
+  40: { name: "Khavedamsa", purpose: "Maternal lineage" },
+  45: { name: "Akshavedamsa", purpose: "Character, conduct" },
+  60: { name: "Shashtiamsa", purpose: "Past-life karma" },
+};
+
+/** Build a varga-meta entry for division n. */
+function vargaMeta(n: number): VargaMeta {
+  const info = VARGA_INFO[n];
+  return {
+    key: `d${n}`,
+    label: info ? `D${n} · ${info.name}` : `D${n}`,
+    purpose: info ? info.purpose : "Divisional chart (cyclic)",
+  };
+}
+
+// The classical Shodasavarga (16) — used by the Shodashvarga table.
+const SHODASAVARGA_N = [1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60];
+export const VARGAS: VargaMeta[] = SHODASAVARGA_N.map(vargaMeta);
+
+// Every divisional chart from D1 to D60 — used by the Divisional Charts explorer.
+export const ALL_VARGAS: VargaMeta[] = Array.from({ length: 60 }, (_, i) => vargaMeta(i + 1));
 
 // ── House / planet detail (for the interactive chart explorer) ────────────────
 

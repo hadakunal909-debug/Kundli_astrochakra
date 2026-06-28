@@ -1266,6 +1266,42 @@ thead th {
   padding: 5px 6px;
 }
 
+/* Special lagnas & upagrahas */
+.sl-intro {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+  max-width: 70ch;
+}
+.sl-heading {
+  font-size: 15px;
+  margin: 22px 0 8px;
+}
+.sl-table td,
+.sl-table th {
+  text-align: left;
+  vertical-align: top;
+}
+.sl-abbr {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.sl-note {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 44ch;
+}
+.bb-sig {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+.bb-tenants {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* Lal Kitab layout */
 .lk-grid {
   display: grid;

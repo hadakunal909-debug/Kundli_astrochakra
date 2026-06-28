@@ -7,6 +7,9 @@ import { KpReport } from './kp';
 import { JaiminiReport } from './jaimini';
 import { YoginiDashaResult } from '../core/yogini-dasha';
 import { VarshaphalReport } from './varshaphal';
+import { SpecialLagnasResult } from './special-lagnas';
+import { BhavaChalitResult } from './bhava-chalit';
+import { BhavatBhavamResult } from './bhavat-bhavam';
 
 /**
  * Represents a single House (Bhava) in the Kundli.
@@ -79,6 +82,9 @@ export interface Kundli {
     jaimini?: JaiminiReport;
     yogini?: YoginiDashaResult;
     varshaphal?: VarshaphalReport;
+    specialLagnas?: SpecialLagnasResult;
+    chalit?: BhavaChalitResult;
+    bhavatBhavam?: BhavatBhavamResult;
 }
 
 export interface VargaChart {

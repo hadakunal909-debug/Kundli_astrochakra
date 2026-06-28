@@ -4,6 +4,7 @@ import { getNumerology } from "@/lib/numerology";
 import { getPremiumScores, type PremiumScores } from "./scores";
 import { amsaLabel } from "./varga";
 import type { DetectedYoga, Factors } from "./factors";
+import { SIGN_TRAITS, NAKSHATRA_TRAIT, firstName, planetCondition, planetInHouse, tenants } from "./interpret";
 
 // All prose in this file is original, generated from the chart's factors/scores.
 
@@ -14,11 +15,6 @@ const ELEMENT_CAREERS: Record<string, string[]> = {
   Air: ["communication & media", "technology", "consulting", "design", "networks"],
   Water: ["healthcare & healing", "hospitality", "research", "creative arts", "marine/chemicals"],
 };
-const SIGN_TRAIT = [
-  "bold and pioneering", "steady and grounded", "curious and communicative", "caring and intuitive",
-  "confident and warm", "precise and practical", "fair and relationship-minded", "intense and determined",
-  "optimistic and freedom-loving", "disciplined and ambitious", "original and humane", "imaginative and compassionate",
-];
 const HOUSE_THEME = [
   "self & vitality", "wealth & speech", "courage & initiative", "home & heart", "creativity & children",
   "work & health", "partnership", "transformation", "fortune & dharma", "career & status", "gains & network", "release & solitude",
@@ -91,6 +87,11 @@ export function getPremiumContent(data: KundliResponse): PremiumContent {
   const f = s.factors;
   const ps = (p: string) => f.planetStrength[p] ?? 45;
   const lagnaLord = lordOfRashi(f.ascSign0 + 1);
+  // Personalization handles: name, the Moon's nakshatra colour, and a condition helper.
+  const name = firstName(data.name);
+  const moonNak = k.planets["Moon"]?.nakshatra ?? "";
+  const moonNakTrait = NAKSHATRA_TRAIT[moonNak] ?? "";
+  const cond = (p: string) => planetCondition(p, f.dignity[p] ?? {});
   // Echo each life-area score's dominant reason into the written prose, so the
   // narrative matches the dashboard rather than reading generically.
   const noteFor = (key: string) => s.scores.find((x) => x.key === key)?.note ?? "";
@@ -100,7 +101,7 @@ export function getPremiumContent(data: KundliResponse): PremiumContent {
   const kkSign0 = RASHI_NAMES.indexOf(k.jaimini?.karakamsa ?? "");
   const NAT_BEN = ["Jupiter", "Venus", "Mercury", "Moon"];
   const karakamsaNote = kkSign0 >= 0
-    ? `Your Karakamsa — the soul-planet's navamsa sign — is ${RASHI_NAMES[kkSign0]}, colouring your innate working nature as ${SIGN_TRAIT[kkSign0]} and drawing you toward ${ELEMENT_CAREERS[elementOf(kkSign0)].slice(0, 3).join(", ")}.`
+    ? `Your Karakamsa — the soul-planet's navamsa sign — is ${RASHI_NAMES[kkSign0]}, colouring your innate working nature as ${SIGN_TRAITS[kkSign0]} and drawing you toward ${ELEMENT_CAREERS[elementOf(kkSign0)].slice(0, 3).join(", ")}.`
     : "";
   let upapadaNote = "";
   if (ulSign0 >= 0) {
@@ -113,22 +114,28 @@ export function getPremiumContent(data: KundliResponse): PremiumContent {
       : hasMal && !hasBen
       ? "A malefic just after it asks for patience and care to keep the marriage steady."
       : "The bond tends to develop steadily as both partners mature.";
-    upapadaNote = `Your Upapada Lagna (the marriage arudha) falls in ${RASHI_NAMES[ulSign0]}, suggesting a spouse who is ${SIGN_TRAIT[ulSign0]}. ${tone}`;
+    upapadaNote = `Your Upapada Lagna (the marriage arudha) falls in ${RASHI_NAMES[ulSign0]}, suggesting a spouse who is ${SIGN_TRAITS[ulSign0]}. ${tone}`;
   }
 
   // 2. Life theme
   const lifeTheme =
-    `Your soul's chief signification is ${f.atmakaraka} — your deepest growth revolves around ${PURPOSE[f.atmakaraka]}. ` +
-    `With ${RASHI_NAMES[f.ascSign0]} rising you are ${SIGN_TRAIT[f.ascSign0]}, and your fortune flows through ${HOUSE_THEME[8]} ruled by ${f.bhagyaLord}. ` +
-    `The recurring theme of this life is learning to express ${PURPOSE[f.atmakaraka]} with maturity.`;
+    `${name}, your soul's chief significator is ${f.atmakaraka} (${cond(f.atmakaraka)}) — your deepest growth turns on ${PURPOSE[f.atmakaraka]}. ` +
+    `With ${RASHI_NAMES[f.ascSign0]} rising you are ${SIGN_TRAITS[f.ascSign0]}` +
+    (moonNakTrait ? `, and with the Moon in ${moonNak} you are ${moonNakTrait}` : "") + `. ` +
+    `Fortune flows through your 9th house of ${HOUSE_THEME[8]}, ruled by ${f.bhagyaLord} in your ${ord(f.planetHouse[f.bhagyaLord])} house. ` +
+    `The recurring lesson of this life is to express ${PURPOSE[f.atmakaraka]} with maturity and self-honesty.`;
 
   // 3. Career
   const tenthSign = f.signOfHouse(10);
   const tenthLord = lordOfRashi(tenthSign + 1);
   const lordHouse = f.planetHouse[tenthLord];
   const industries = ELEMENT_CAREERS[elementOf(tenthSign)];
+  const tenthOcc = f.occupants[10] ?? [];
   const careerText =
-    `Your career axis is shaped by ${tenthLord}, lord of the 10th, placed in your ${ord(lordHouse)} house of ${HOUSE_THEME[lordHouse - 1]}. ` +
+    `${name}, your career axis is shaped by ${planetInHouse(tenthLord, lordHouse, f.dignity[tenthLord] ?? {})} — it is the lord of your 10th. ` +
+    (tenthOcc.length
+      ? `${tenants(tenthOcc)} sit${tenthOcc.length > 1 ? "" : "s"} in your 10th house, stamping your work with their nature. `
+      : "") +
     `With ${aAn(elementOf(tenthSign))} ${elementOf(tenthSign)}-element 10th house, you are well suited to ${industries.slice(0, 3).join(", ")} and similar fields. ` +
     `${s.byKey.career >= 65 ? "Your professional foundations are strong — aim high and take ownership." : "Build your career patiently; consistent skill-building will pay off steadily."} ` +
     `In your chart specifically, the decisive factors are ${noteFor("career")}.` +
@@ -136,26 +143,38 @@ export function getPremiumContent(data: KundliResponse): PremiumContent {
 
   // 4. Money
   const wealthYoga = f.yogas.find((y) => y.name.includes("Dhana") || y.name.includes("Lakshmi"));
+  const secondLord = lordOfRashi(f.signOfHouse(2) + 1);
+  const eleventhLord = lordOfRashi(f.signOfHouse(11) + 1);
   const money =
-    `Your wealth houses read ${band(f.houseStrength[2])} (savings/2nd) and ${band(f.houseStrength[11])} (income/11th). ` +
-    `${wealthYoga ? `${wealthYoga.name} supports money formation. ` : ""}` +
+    `${name}, your wealth houses read ${band(f.houseStrength[2])} (savings/2nd) and ${band(f.houseStrength[11])} (income/11th). ` +
+    `Your 2nd lord ${secondLord} sits in the ${ord(f.planetHouse[secondLord])} house and your 11th lord ${eleventhLord} in the ${ord(f.planetHouse[eleventhLord])} — pointing to where money is earned and where it flows. ` +
+    `${wealthYoga ? `${wealthYoga.name} supports wealth formation. ` : ""}` +
     `${s.byKey.wealth >= 65 ? "Wealth can accumulate well — favour disciplined investing over impulsive spending." : "Focus first on stable income and a savings habit before taking financial risks."} ` +
     `Here the decisive factors are ${noteFor("wealth")}.`;
 
   // 5. Relationships
   const seventhSign = f.signOfHouse(7);
+  const seventhLord = lordOfRashi(seventhSign + 1);
+  const seventhOcc = f.occupants[7] ?? [];
   const relationships =
-    `Your 7th house falls in ${RASHI_NAMES[seventhSign]}, suggesting a partner who is ${SIGN_TRAIT[seventhSign]}. ` +
-    `Venus, the planet of love, is ${utilLabel(ps("Venus")).toLowerCase()} in your chart. ` +
+    `${name}, your 7th house falls in ${RASHI_NAMES[seventhSign]}, suggesting a partner who is ${SIGN_TRAITS[seventhSign]}. ` +
+    `Its lord ${seventhLord} sits in your ${ord(f.planetHouse[seventhLord])} house, and Venus — love's significator — is ${cond("Venus")}. ` +
+    (seventhOcc.length ? `${tenants(seventhOcc)} in the 7th ${seventhOcc.length > 1 ? "colour" : "colours"} your partnerships directly. ` : "") +
     `${s.byKey.relationships >= 65 ? "Partnerships are a source of strength and balance for you." : "Relationships ask for patience and clear communication to truly flourish."} ` +
     `The decisive factors here are ${noteFor("relationships")}.` +
     (upapadaNote ? ` ${upapadaNote}` : "");
 
   // 6. Personality
+  const ascLordHouse = f.planetHouse[lagnaLord];
+  const firstOcc = f.occupants[1] ?? [];
+  const mercRetro = k.planets["Mercury"]?.isRetrograde;
   const personality =
-    `Outwardly you come across as ${SIGN_TRAIT[f.ascSign0]} (${RASHI_NAMES[f.ascSign0]} ascendant). ` +
-    `Emotionally you are ${SIGN_TRAIT[f.planetSign0["Moon"]]} (${RASHI_NAMES[f.planetSign0["Moon"]]} Moon), ` +
-    `and your mind works in a ${SIGN_TRAIT[f.planetSign0["Mercury"]]} way (${RASHI_NAMES[f.planetSign0["Mercury"]]} Mercury).`;
+    `${name}, outwardly you come across as ${SIGN_TRAITS[f.ascSign0]} (${RASHI_NAMES[f.ascSign0]} ascendant). ` +
+    `Your chart-ruler ${lagnaLord} sits in your ${ord(ascLordHouse)} house of ${HOUSE_THEME[ascLordHouse - 1]} (${cond(lagnaLord)}), shaping how you assert yourself. ` +
+    (firstOcc.length ? `With ${tenants(firstOcc)} in the 1st house, that energy is stamped firmly onto your personality. ` : "") +
+    `Emotionally you are ${SIGN_TRAITS[f.planetSign0["Moon"]]} (${RASHI_NAMES[f.planetSign0["Moon"]]} Moon)` +
+    (moonNakTrait ? `, ${moonNakTrait}` : "") + `. ` +
+    `Your mind is ${SIGN_TRAITS[f.planetSign0["Mercury"]]} (${RASHI_NAMES[f.planetSign0["Mercury"]]} Mercury${mercRetro ? ", retrograde — reflective and original" : ""}).`;
 
   // 7. Planet utilization
   const planetUse: PlanetUse[] = ALL.map((p) => ({
@@ -207,9 +226,11 @@ export function getPremiumContent(data: KundliResponse): PremiumContent {
   };
 
   // 17. Health
+  const sixthOcc = f.occupants[6] ?? [];
   const health =
-    `Your vitality reads ${band(f.houseStrength[1])} (Lagna) with ${aAn(elementOf(f.ascSign0))} ${elementOf(f.ascSign0)} constitution. ` +
+    `${name}, your vitality reads ${band(f.houseStrength[1])} (Lagna) with ${aAn(elementOf(f.ascSign0))} ${elementOf(f.ascSign0)} constitution. ` +
     `${elementLifestyle(elementOf(f.ascSign0))} ` +
+    (sixthOcc.length ? `${tenants(sixthOcc)} in your 6th house (health & routine) ${sixthOcc.length > 1 ? "ask" : "asks"} for steady habits there. ` : "") +
     `In your chart the decisive factors are ${noteFor("health")}. ` +
     `This is lifestyle guidance for wellbeing, not medical advice.`;
 

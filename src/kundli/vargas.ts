@@ -326,29 +326,51 @@ export function getShastiamsaSign(longitude: number): number {
 
 
 
+// --- Generic divisional sign (cyclic / Parivritti scheme) ---
+// Used for every division that has no special classical rule (D5, D6, D8, D11, …).
+// The 30° sign is split into N equal parts; divisions are counted continuously from
+// 0° Aries, so the Dn sign = (signIndex * N + part) mod 12.
+function getCyclicSign(longitude: number, n: number): number {
+  const lon = ((longitude % 360) + 360) % 360;
+  const sign = Math.floor(lon / 30);
+  const deg = lon % 30;
+  const part = Math.floor(deg / (30 / n));
+  return (sign * n + part) % 12;
+}
+
+// Classical charts keep their traditional rules; everything else uses the cyclic rule.
+const SPECIAL_VARGAS: Record<number, (lon: number) => number> = {
+  1: getRashiSign,
+  2: getHoraSign,
+  3: getDrekkanaSign,
+  4: getChaturthamshaSign,
+  7: getSaptamsaSign,
+  9: getNavamsaSign,
+  10: getDasamsaSign,
+  12: getDwadasamsaSign,
+  16: getShodasamsaSign,
+  20: getVimsamsaSign,
+  24: getChaturvimshamsaSign,
+  27: getSaptavimshamshaSign,
+  30: getTrimshamshaSign,
+  40: getKhavedamshaSign,
+  45: getAkshavedamshaSign,
+  60: getShastiamsaSign,
+};
+
 // --- Main Export ---
+// Computes every divisional chart from D1 to D60. The classical Shodasavarga charts
+// use their traditional formulas; the remaining divisions use the cyclic rule.
 export function getAllVargas(
   ascendantLength: number,
   planets: Record<string, { longitude: number }>,
 ): Record<string, VargaChart> {
-  return {
-    d1: createVargaChart(ascendantLength, planets, getRashiSign),
-    d2: createVargaChart(ascendantLength, planets, getHoraSign),
-    d3: createVargaChart(ascendantLength, planets, getDrekkanaSign),
-    d4: createVargaChart(ascendantLength, planets, getChaturthamshaSign),
-    d7: createVargaChart(ascendantLength, planets, getSaptamsaSign),
-    d9: createVargaChart(ascendantLength, planets, getNavamsaSign),
-    d10: createVargaChart(ascendantLength, planets, getDasamsaSign),
-    d12: createVargaChart(ascendantLength, planets, getDwadasamsaSign),
-    d16: createVargaChart(ascendantLength, planets, getShodasamsaSign),
-    d20: createVargaChart(ascendantLength, planets, getVimsamsaSign),
-    d24: createVargaChart(ascendantLength, planets, getChaturvimshamsaSign),
-    d27: createVargaChart(ascendantLength, planets, getSaptavimshamshaSign),
-    d30: createVargaChart(ascendantLength, planets, getTrimshamshaSign),
-    d40: createVargaChart(ascendantLength, planets, getKhavedamshaSign),
-    d45: createVargaChart(ascendantLength, planets, getAkshavedamshaSign),
-    d60: createVargaChart(ascendantLength, planets, getShastiamsaSign),
-  };
+  const out: Record<string, VargaChart> = {};
+  for (let n = 1; n <= 60; n++) {
+    const fn = SPECIAL_VARGAS[n] ?? ((lon: number) => getCyclicSign(lon, n));
+    out[`d${n}`] = createVargaChart(ascendantLength, planets, fn);
+  }
+  return out;
 }
 
 // Keep the old single export for backward compatibility or direct use if needed,
