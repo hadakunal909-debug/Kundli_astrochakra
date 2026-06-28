@@ -10,7 +10,7 @@
  * GitHub Actions workflow, so the two always produce the same artifact.
  */
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, cpSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,6 +44,18 @@ const copy = (from, to) => {
 };
 copy(join(root, "web", ".next", "static"), join(standalone, "web", ".next", "static"));
 copy(join(root, "web", "public"), join(standalone, "web", "public"));
+
+// 4. The calc library (@prisri/jyotish) is the monorepo root, linked into node_modules
+//    as a symlink. Next does NOT reliably copy that symlinked workspace package into the
+//    standalone bundle, so on a clean machine (CI) the bundle ships WITHOUT the library
+//    and the deployed app keeps stale calc code. Copy the freshly-built library in as
+//    real files so the bundle is genuinely self-contained.
+const libDest = join(standalone, "node_modules", "@prisri", "jyotish");
+rmSync(libDest, { recursive: true, force: true });
+mkdirSync(libDest, { recursive: true });
+cpSync(join(root, "dist"), join(libDest, "dist"), { recursive: true });
+cpSync(join(root, "package.json"), join(libDest, "package.json"));
+console.log(`bundled @prisri/jyotish (real files) -> ${libDest}`);
 
 console.log(`\n✓ cPanel bundle ready: ${standalone}`);
 console.log("  Ship the CONTENTS of that folder to your cPanel app root.");
