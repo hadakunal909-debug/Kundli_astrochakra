@@ -325,6 +325,35 @@ export function buildD1Houses(data: KundliResponse): HouseDetail[] {
   return out;
 }
 
+/** Per-house details for a special-lagna chart — natal planets reckoned from the
+ *  given ascendant sign, with their natal nakshatra, direction and dignity. */
+export function buildLagnaHouses(data: KundliResponse, ascRashi1: number): HouseDetail[] {
+  const asc0 = (((ascRashi1 - 1) % 12) + 12) % 12;
+  const byHouse: Record<number, { name: string; sign0: number }[]> = {};
+  for (const [name, p] of Object.entries(data.kundli.planets)) {
+    const sign0 = Math.floor((((p.longitude % 360) + 360) % 360) / 30);
+    const house = ((sign0 - asc0 + 12) % 12) + 1;
+    (byHouse[house] ||= []).push({ name, sign0 });
+  }
+  const out: HouseDetail[] = [];
+  for (let n = 1; n <= 12; n++) {
+    const planets: PlanetDetail[] = [];
+    if (n === 1) planets.push({ name: "Ascendant", sub: "Lagna" });
+    for (const { name, sign0 } of byHouse[n] ?? []) {
+      const np = data.kundli.planets[name];
+      planets.push({
+        name,
+        sub: np?.nakshatra,
+        status: np ? (np.isRetrograde ? "Retrograde" : "Direct") : undefined,
+        dignity: planetDignityBySign(name, sign0),
+        iconName: name,
+      });
+    }
+    out.push({ signIndex0: (asc0 + (n - 1)) % 12, planets });
+  }
+  return out;
+}
+
 /** Per-house details for any divisional chart (dignity relative to that varga's signs). */
 export function buildVargaHouses(data: KundliResponse, key: string): HouseDetail[] | null {
   if (key === "d1") return buildD1Houses(data);

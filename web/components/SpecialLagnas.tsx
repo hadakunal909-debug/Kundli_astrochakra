@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import type { KundliResponse } from "@/lib/types";
-import { formatDMS, buildLagnaChart } from "@/lib/jyotish-ui";
-import NorthChart from "./NorthChart";
-import SouthChart from "./SouthChart";
+import { formatDMS, buildLagnaChart, buildLagnaHouses } from "@/lib/jyotish-ui";
+import ChartWithHouses from "./ChartWithHouses";
 
 type Point = NonNullable<KundliResponse["kundli"]["specialLagnas"]>["lagnas"][number];
 type Style = "north" | "south";
@@ -40,7 +39,9 @@ function PointTable({ points }: { points: Point[] }) {
 
 export default function SpecialLagnas({ data }: { data: KundliResponse }) {
   const [style, setStyle] = useState<Style>("north");
+  const [idx, setIdx] = useState(0);
   const sl = data.kundli.specialLagnas;
+
   if (!sl) {
     return (
       <p className="meta-line">
@@ -50,12 +51,18 @@ export default function SpecialLagnas({ data }: { data: KundliResponse }) {
     );
   }
 
+  const lagnas = sl.lagnas;
+  const cur = lagnas[Math.max(0, Math.min(idx, lagnas.length - 1))];
+  const cd = buildLagnaChart(data, cur.rashi);
+  const houses = buildLagnaHouses(data, cur.rashi);
+  const step = (d: number) => setIdx((idx + d + lagnas.length) % lagnas.length);
+
   return (
     <div className="sl-wrap">
       <p className="sl-intro">
-        Special ascendants and shadow points used in classical Vedic analysis. Each special
-        lagna is cast as a full chart — its sign becomes the 1st house and the planets are
-        placed around it, read just like the Rashi (D1) chart for its own significations.
+        Each special ascendant is cast as a full chart — its sign becomes the 1st house and
+        the planets are placed around it. Pick a lagna below, then tap any house to read its
+        sign, lord and planets.
       </p>
 
       <div className="varga-toolbar">
@@ -67,26 +74,33 @@ export default function SpecialLagnas({ data }: { data: KundliResponse }) {
             South Indian
           </button>
         </div>
+
+        <div className="varga-picker">
+          <button className="btn-ghost varga-nav" onClick={() => step(-1)} aria-label="Previous lagna">‹</button>
+          <select value={idx} onChange={(e) => setIdx(Number(e.target.value))}>
+            {lagnas.map((p, i) => (
+              <option key={p.name} value={i}>
+                {p.name} — {p.rashiName}
+              </option>
+            ))}
+          </select>
+          <button className="btn-ghost varga-nav" onClick={() => step(1)} aria-label="Next lagna">›</button>
+        </div>
       </div>
 
-      <div className="varga-grid">
-        {sl.lagnas.map((p) => {
-          const cd = buildLagnaChart(data, p.rashi);
-          return (
-            <div className="varga-cell" key={p.name}>
-              {style === "north" ? (
-                <NorthChart data={cd} title={`${p.name} · ${p.rashiName}`} />
-              ) : (
-                <SouthChart data={cd} title={`${p.name} · ${p.rashiName}`} />
-              )}
-              <p className="varga-purpose">{p.note}</p>
-            </div>
-          );
-        })}
-      </div>
+      <ChartWithHouses
+        key={cur.name + style}
+        chartData={cd}
+        title={`${cur.name} · ${cur.rashiName}`}
+        houses={houses}
+        style={style}
+      />
+      <p className="varga-count">
+        {cur.note} · Lagna {idx + 1} of {lagnas.length}
+      </p>
 
       <h3 className="sl-heading">Special Lagnas · Positions</h3>
-      <PointTable points={sl.lagnas} />
+      <PointTable points={lagnas} />
 
       <h3 className="sl-heading">Upagrahas · Shadow Sub-planets</h3>
       <PointTable points={sl.upagrahas} />
