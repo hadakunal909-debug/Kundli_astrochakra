@@ -1,10 +1,10 @@
 name: Deploy to cPanel
 
-# Push to main -> build the standalone bundle on GitHub -> upload it to cPanel
-# over SFTP (works even when shell access is disabled) -> restart the Passenger
-# Node app by refreshing tmp/restart.txt -> verify the new code is actually live.
-# The build always runs (so every push is validated); the deploy steps only run
-# once the cPanel secrets exist.
+# Push to main -> build the self-contained standalone bundle on GitHub -> upload it to
+# cPanel over FTP (this host's SFTP caps sessions and drops connections, so FTP is used
+# instead). The build always runs (so every push is validated); deploy runs once the FTP
+# secrets exist. Going live still needs a manual cPanel restart (Passenger ignores
+# tmp/restart.txt on this host).
 
 on:
   push:
@@ -32,79 +32,44 @@ jobs:
       - name: Build cPanel bundle
         run: npm run build:cpanel
 
-      # Passenger restarts the app whenever tmp/restart.txt changes. Stamp it so
-      # every deploy triggers a restart after the files land.
+      # Passenger restart trigger (uploaded for when auto-restart is wired up later).
       - name: Stamp restart trigger
         run: |
           mkdir -p web/.next/standalone/tmp
           date -u +%s > web/.next/standalone/tmp/restart.txt
 
       # secrets can't be read inside an `if:`, so compute a gate flag here.
-      - name: Check cPanel secrets are configured
+      - name: Check FTP secrets are configured
         id: gate
         run: |
-          if [ -n "${{ secrets.CPANEL_SSH_HOST }}" ]; then
+          if [ -n "${{ secrets.FTP_SERVER }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::cPanel secrets not set yet — skipping deploy. Build succeeded."
+            echo "::notice::FTP secrets not set yet — skipping deploy. Build succeeded."
           fi
 
-      - name: Install lftp
+      - name: Deploy via FTP
         if: steps.gate.outputs.ready == 'true'
-        run: sudo apt-get update && sudo apt-get install -y lftp
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ secrets.FTP_PROTOCOL || 'ftp' }}
+          port: ${{ secrets.FTP_PORT || '21' }}
+          # The self-contained bundle (server + node_modules + .next/static + public).
+          local-dir: ./web/.next/standalone/
+          # App root relative to the FTP login home. With a dedicated FTP account scoped to
+          # the app folder this is "/"; with the main account it's "kundli.astrochakra.co/".
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # IMPORTANT: do NOT use the action's default node_modules exclusion — the
+          # standalone bundle's node_modules is required at runtime.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.next/cache/**
 
-      - name: Write SSH key
-        if: steps.gate.outputs.ready == 'true'
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-
-      - name: Deploy over SFTP
-        if: steps.gate.outputs.ready == 'true'
-        env:
-          HOST: ${{ secrets.CPANEL_SSH_HOST }}
-          USER: ${{ secrets.CPANEL_SSH_USER }}
-          PORT: ${{ secrets.CPANEL_SSH_PORT }}
-          APP: ${{ secrets.CPANEL_APP_PATH }}
-        run: |
-          PORT="${PORT:-22}"
-          SSH="ssh -a -x -i $HOME/.ssh/id_deploy -p $PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          # cmd:fail-exit makes lftp exit non-zero on ANY failed command, so a broken
-          # connection or transfer turns the job red instead of passing silently.
-          # Shared cPanel caps concurrent SSH sessions, so parallel SFTP channels fail
-          # with "subsystem request failed on channel 0". Use ONE sequential connection.
-          lftp -c "
-            set cmd:fail-exit yes;
-            set sftp:auto-confirm yes;
-            set sftp:connect-program \"$SSH\";
-            set net:connection-limit 1;
-            set net:max-retries 5;
-            set net:reconnect-interval-base 5;
-            set net:timeout 30;
-            set mirror:parallel-transfer-count 1;
-            set mirror:use-pget-n 1;
-            open -u \"$USER,x\" sftp://$HOST;
-            mkdir -f \"$APP/tmp\";
-            # 3rd-party deps: large but stable — skip unchanged by size.
-            mirror -R --ignore-time --no-perms web/.next/standalone/node_modules \"$APP/node_modules\";
-            # our calculation library changes every deploy — force an exact match.
-            mirror -R --delete --no-perms web/.next/standalone/node_modules/@prisri \"$APP/node_modules/@prisri\";
-            # the ENTIRE app subtree (server.js, public, .next/server AND .next/static) —
-            # force fresh so the served JS chunks always match the server build.
-            mirror -R --delete --no-perms web/.next/standalone/web \"$APP/web\";
-            put -O \"$APP\" web/.next/standalone/package.json;
-            put -O \"$APP/tmp\" web/.next/standalone/tmp/restart.txt;
-            echo '=== remote static chunks after upload ===';
-            cls -1 \"$APP/web/.next/static/chunks/\";
-            bye
-          "
-
-      # Upload succeeded above. This host's Passenger does NOT honor tmp/restart.txt, so
-      # going live needs a manual restart (cPanel → Setup Node.js App → Restart). This
-      # step never fails the run — it just reports whether the live site already reflects
-      # the new build, and reminds you to restart if not.
       - name: Check live site (restart is manual on this host)
         if: steps.gate.outputs.ready == 'true'
         env:
