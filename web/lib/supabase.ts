@@ -96,3 +96,41 @@ export async function saveBirthInput(record: BirthInputRecord): Promise<boolean>
     return false;
   }
 }
+
+/**
+ * Diagnostic for the /api/db-check route. Reports whether the env vars are present
+ * at runtime and whether a real query against `birth_inputs` succeeds. NEVER returns
+ * the secret itself — only booleans and any error message.
+ */
+export async function checkConnection(): Promise<{
+  urlSet: boolean;
+  keySet: boolean;
+  ok: boolean;
+  error?: string;
+}> {
+  const urlSet = !!process.env.SUPABASE_URL;
+  const keySet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  const supabase = getClient();
+  if (!supabase) {
+    return {
+      urlSet,
+      keySet,
+      ok: false,
+      error: "Supabase client not configured — env vars missing at runtime.",
+    };
+  }
+
+  try {
+    const { error } = await supabase.from("birth_inputs").select("id").limit(1);
+    if (error) return { urlSet, keySet, ok: false, error: error.message };
+    return { urlSet, keySet, ok: true };
+  } catch (e) {
+    return {
+      urlSet,
+      keySet,
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
