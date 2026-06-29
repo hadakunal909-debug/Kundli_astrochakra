@@ -9,6 +9,7 @@ import {
 import type { Panchangam } from "@prisri/jyotish";
 import { resolveBirthInstant } from "@/lib/time";
 import { geocodePlace } from "@/lib/geocode";
+import { saveBirthInput } from "@/lib/supabase";
 import type {
   KundliRequest,
   KundliResponse,
@@ -98,6 +99,19 @@ export async function POST(request: Request) {
     } catch {
       warnings.push("Panchang details could not be computed for this location.");
     }
+
+    // Persist the birth inputs for our records. Fire-and-forget: a DB problem must
+    // never block or fail chart generation (saveBirthInput swallows its own errors).
+    void saveBirthInput({
+      name,
+      birthDate: date,
+      birthTime: time,
+      placeLabel: place.label,
+      placeLat: place.lat,
+      placeLon: place.lon,
+      houseSystem: config.houseSystem,
+      ayanamsa: config.ayanamsa,
+    });
 
     const response: KundliResponse = {
       name,
